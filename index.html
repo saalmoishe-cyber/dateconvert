@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" type="image/x-icon" href="https://calendar.jewishluach.com/logo.svg" />
+    <title>Gregorian to Hebrew Date Converter</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 700px;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+            color: #333;
+        }
+        h2 { text-align: center; }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: monospace;
+            resize: vertical;
+        }
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        button {
+            flex: 1;
+            padding: 12px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        #convertBtn { background-color: #0056b3; }
+        #copyBtn { background-color: #28a745; display: none; }
+        #clearBtn { background-color: #dc3545; }
+        button:hover { opacity: 0.9; }
+        button:disabled { background-color: #999; cursor: not-allowed; }
+        
+        #output {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            min-height: 50px;
+            border: 1px solid #e2e8f0;
+            text-align: right;
+            direction: rtl;
+        }
+        .status { text-align: center; margin-top: 10px; font-size: 14px; color: #666; }
+    </style>
+</head>
+<body onload="setFocusToTextBox()">
+
+    <div class="container">
+        <h2>Date Converter</h2>
+        <p>Paste Gregorian dates (one per line):</p>
+        
+        <textarea id="dateInput" placeholder="12/2/2020&#10;3/27/2026"></textarea>
+        
+        <div class="btn-group">
+            <button id="convertBtn" onclick="convertDates()">Convert Dates</button>
+            <button id="copyBtn" onclick="copyToClipboard()">Copy Results</button>
+            <button id="clearBtn" onclick="clearContent()">Clear</button>
+        </div>
+        
+        <div id="status" class="status"></div>
+        <div id="output"></div>
+    </div>
+
+    <script>
+
+        let globalResults = "";
+
+        async function convertDates() {
+            const input = document.getElementById('dateInput').value.trim();
+            const outputDiv = document.getElementById('output');
+            const statusDiv = document.getElementById('status');
+            const convertBtn = document.getElementById('convertBtn');
+            const copyBtn = document.getElementById('copyBtn');
+            
+            if (!input) return;
+
+            convertBtn.disabled = true;
+            copyBtn.style.display = "none";
+            statusDiv.textContent = "Processing...";
+            outputDiv.textContent = "";
+            globalResults = "";
+
+            const lines = input.split('\n');
+            let resultsArray = [];
+
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
+
+                const dateObj = new Date(line);
+                if (isNaN(dateObj.getTime())) {
+                    resultsArray.push(`[Invalid: ${line}]`);
+                    continue;
+                }
+
+                try {
+                    const gy = dateObj.getFullYear();
+                    const gm = dateObj.getMonth() + 1;
+                    const gd = dateObj.getDate();
+                    
+                    const response = await fetch(`https://www.hebcal.com/converter?cfg=json&gy=${gy}&gm=${gm}&gd=${gd}&g2h=1`);
+                    const data = await response.json();
+
+                    if (data && data.hebrew) {
+                        // 1. Remove Niqqud
+                        let cleanHebrew = data.hebrew.replace(/[\u0591-\u05C7]/g, '');
+                        // 2. Remove the prefix "ב" from the month
+                        cleanHebrew = cleanHebrew.replace(/(\s)ב([\u05D0-\u05EA])/, '$1$2');
+                        resultsArray.push(cleanHebrew);
+                    }
+                } catch (e) {
+                    resultsArray.push(`[Error: ${line}]`);
+                }
+            }
+
+            // Join with \r\n (CRLF) for Excel compatibility
+            globalResults = resultsArray.join('\r\n');
+            outputDiv.textContent = globalResults;
+            
+            statusDiv.textContent = "Conversion complete!";
+            convertBtn.disabled = false;
+            copyBtn.style.display = "block";
+        }
+
+	function setFocusToTextBox() {
+                document.getElementById("dateInput").focus();
+            }
+
+        function copyToClipboard() {
+            const el = document.createElement('textarea');
+            el.value = globalResults;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            
+            const copyBtn = document.getElementById('copyBtn');
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = "Copied!";
+            setTimeout(() => { copyBtn.textContent = originalText; }, 2000);
+        }
+
+        function clearContent() {
+            document.getElementById('dateInput').value = '';
+            document.getElementById('output').textContent = '';
+            document.getElementById('status').textContent = '';
+            document.getElementById('copyBtn').style.display = 'none';
+            globalResults = '';
+            document.getElementById('dateInput').focus();
+        }
+    </script>
+</body>
+</html>
